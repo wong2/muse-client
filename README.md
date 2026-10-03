@@ -82,6 +82,17 @@ bun run cli send "Hello Muse"
 bun run cli watch --json
 ```
 
+To reset local pairing, stop any running chat or pairing process, then run:
+
+```sh
+npm run cli -- unpair
+npm run cli -- pair
+```
+
+`unpair` removes `pairing.json`, preserving the device identity and SDK token
+for re-pairing. It also supports `--credentials`. To remove the device from Muse,
+use **Settings > Devices** in the phone app.
+
 `chat` subscribes before accepting input, displays reply text as it arrives, and
 exits with `/quit` or Ctrl+C. Pass an existing side-chat ID with `--session` to
 continue it. `send` prints the message acknowledgement,
@@ -167,6 +178,7 @@ const vms = await account.listVMs(); // Includes sensitive per-VM authToken valu
 | `client.subscribe({ sessionId?, signal? })` | Receive an async iterable of chat events with `close()` |
 | `client.close()` | Close the socket and reject pending operations |
 | `loadCredentials(directory?)` / `saveCredentials(credentials, directory?)` | Read/update existing gadget pairing files |
+| `unpair(directory?)` (from `muse-ts/credentials`) | Remove local pairing credentials; return whether a pairing was removed |
 | `pairMacOS({ directory?, sdkToken?, probe?, signal?, onProgress? })` | Authorize this Mac through the phone app; probe returns undefined |
 | `buildPairingHelper()` | Compile the bundled Swift transport without starting Bluetooth |
 

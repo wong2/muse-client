@@ -69,7 +69,7 @@ export class PairingController {
       }
       if (action === 'pairing_client_finished') {
         session.confirm(command); this.status('pairing_confirmed');
-        this.options.progress('Pairing confirmed in the phone app.'); return;
+        this.options.progress('App consent received; waiting for device credentials.'); return;
       }
       session.assertConfirmed();
       if (action === 'wifi_scan') {

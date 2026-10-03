@@ -3,12 +3,13 @@ import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline';
 import { MuseAccount, MuseClient } from '../src/index.js';
 import type { ChatEvent } from '../src/index.js';
-import { defaultCredentialsDirectory, loadCredentials, saveCredentials } from '../src/credentials.js';
+import { defaultCredentialsDirectory, loadCredentials, saveCredentials, unpair } from '../src/credentials.js';
 
 const HELP = `Muse CLI example
 
   bun run cli pair                        Pair this Mac using the Muse phone app
   bun run cli pair --probe                Test Bluetooth discovery without authorization
+  bun run cli unpair                      Remove local pairing credentials
   bun run cli vms                         List available Muse VMs
   bun run cli check                       Connect and open a chat subscription
   bun run cli chat                        Interactive text chat
@@ -59,9 +60,15 @@ async function main(): Promise<void> {
   if (values.help) { console.log(HELP); return; }
   const sessionId = values.session;
   const command = positionals[0] ?? 'chat';
-  if (!['pair', 'vms', 'check', 'chat', 'send', 'watch'].includes(command)) throw new Error(`Unknown command: ${command}`);
+  if (!['pair', 'unpair', 'vms', 'check', 'chat', 'send', 'watch'].includes(command)) throw new Error(`Unknown command: ${command}`);
   if (command === 'send' && !positionals.slice(1).join(' ').trim()) throw new Error('Usage: cli send "message"');
   const directory = values.credentials ?? defaultCredentialsDirectory();
+  if (command === 'unpair') {
+    const removed = await unpair(directory);
+    console.log(removed ? 'Local pairing removed.' : 'No local pairing found.');
+    console.log('To remove the device from Muse, open Settings > Devices in the phone app.');
+    return;
+  }
   if (command === 'pair') {
     const { runPairCommand } = await import('./pair-command.js');
     await runPairCommand(directory, values['sdk-token-file'], values.probe);

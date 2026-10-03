@@ -11,6 +11,29 @@ export function defaultCredentialsDirectory(): string {
     : '/var/lib/musegadget';
 }
 
+/** Remove local pairing credentials, keeping the device identity and SDK token.
+ * Returns false if no pairing exists. Does not revoke the device on Muse.
+ */
+export async function unpair(directory = defaultCredentialsDirectory()): Promise<boolean> {
+  const lockPath = join(directory, 'pair.lock');
+  let lock;
+  try { lock = await open(lockPath, 'wx', 0o600); }
+  catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return false;
+    if (code === 'EEXIST') throw new Error('Pairing is in progress or the directory is locked. Stop pairing before running unpair.');
+    throw error;
+  }
+  try {
+    await lock.writeFile(String(process.pid));
+    try { await unlink(join(directory, 'pairing.json')); return true; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+      throw error;
+    }
+  } finally { await lock.close(); await unlink(lockPath); }
+}
+
 /** Reads the pairing files from the original gadget SDK / macOS experiment. */
 export async function loadCredentials(directory = defaultCredentialsDirectory()): Promise<DeviceCredentials> {
   const [pairing, identity] = await Promise.all([
