@@ -58,7 +58,7 @@ export class NoiseConnection {
   static connect(url: string, token: string): Promise<NoiseConnection> {
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(url, {
-        headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'muse-ts/0.1.0' },
+        headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'muse-client/0.1.0' },
         handshakeTimeout: 20000, maxPayload: 4 * 1024 * 1024,
         perMessageDeflate: false, followRedirects: false,
       });

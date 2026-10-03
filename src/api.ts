@@ -48,7 +48,7 @@ export class MuseAccount {
     const response = await (this.options.fetch ?? globalThis.fetch)(new URL(path, root), {
       method: body === undefined ? 'GET' : 'POST',
       headers: { Authorization: `Bearer ${token}`, 'X-API-Version': '1.0.0',
-        'User-Agent': 'muse-ts/0.1.0', 'Content-Type': 'application/json' },
+        'User-Agent': 'muse-client/0.1.0', 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
       redirect: 'error',

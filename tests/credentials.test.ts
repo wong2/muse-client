@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { loadCredentials, saveCredentials, unpair } from '../src/credentials.js';
 
 test('imports gadget credentials and atomically preserves metadata with private file permissions', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'muse-ts-test-'));
+  const directory = await mkdtemp(join(tmpdir(), 'muse-client-test-'));
   try {
     await writeFile(join(directory, 'identity.json'), JSON.stringify({ mac: '02:00:00:ab:cd:ef' }));
     await writeFile(join(directory, 'pairing.json'), JSON.stringify({ access_token: 'a', refresh_token: 'r', username: 'keep-me', api_url: 'legacy' }));
@@ -22,7 +22,7 @@ test('imports gadget credentials and atomically preserves metadata with private 
 });
 
 test('unpair removes even malformed credentials, preserves identity/token, and is idempotent', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'muse-ts-unpair-'));
+  const directory = await mkdtemp(join(tmpdir(), 'muse-client-unpair-'));
   try {
     await writeFile(join(directory, 'identity.json'), 'identity');
     await writeFile(join(directory, 'sdk_token'), 'token');
@@ -38,7 +38,7 @@ test('unpair removes even malformed credentials, preserves identity/token, and i
 });
 
 test('unpair respects an active pairing lock', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'muse-ts-unpair-'));
+  const directory = await mkdtemp(join(tmpdir(), 'muse-client-unpair-'));
   try {
     await writeFile(join(directory, 'pair.lock'), 'existing lock');
     await writeFile(join(directory, 'pairing.json'), 'keep');

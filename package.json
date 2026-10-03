@@ -1,16 +1,33 @@
 {
-  "name": "muse-ts",
+  "name": "muse-client",
   "version": "0.1.0",
   "description": "Unofficial TypeScript client for Muse gadget chat",
   "type": "module",
   "license": "Apache-2.0",
-  "engines": { "node": ">=22.18.0" },
-  "exports": {
-    ".": { "types": "./dist/index.d.mts", "import": "./dist/index.mjs" },
-    "./credentials": { "types": "./dist/credentials.d.mts", "import": "./dist/credentials.mjs" },
-    "./pairing": { "types": "./dist/pairing.d.mts", "import": "./dist/pairing.mjs" }
+  "engines": {
+    "node": ">=22.18.0"
   },
-  "files": ["dist", "native", "README.md", "LICENSE", "NOTICE"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./credentials": {
+      "types": "./dist/credentials.d.mts",
+      "import": "./dist/credentials.mjs"
+    },
+    "./pairing": {
+      "types": "./dist/pairing.d.mts",
+      "import": "./dist/pairing.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "native",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
@@ -18,12 +35,22 @@
     "cli": "tsx examples/cli.ts",
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
-  "dependencies": { "ws": "^8.22.0" },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@types/ws": "^8.18.2",
     "tsdown": "^0.23.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wong2/muse-client.git"
+  },
+  "homepage": "https://github.com/wong2/muse-client#readme",
+  "bugs": {
+    "url": "https://github.com/wong2/muse-client/issues"
   }
 }

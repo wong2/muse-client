@@ -40,7 +40,7 @@ export async function buildPairingHelper(onProgress: (message: string) => void =
     readFile(join(nativeDirectory, 'PairingHelper.swift')), readFile(join(nativeDirectory, 'Info.plist')),
   ]);
   const digest = createHash('sha256').update(source).update(plist).update(process.arch).digest('hex').slice(0, 20);
-  const cache = join(homedir(), 'Library', 'Caches', 'muse-ts', 'bluetooth');
+  const cache = join(homedir(), 'Library', 'Caches', 'muse-client', 'bluetooth');
   const destination = join(cache, digest);
   const executable = join(destination, 'Muse Pair.app', 'Contents', 'MacOS', 'MusePair');
   try { await access(executable); return executable; } catch {}

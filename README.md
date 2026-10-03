@@ -1,4 +1,4 @@
-# muse-ts
+# muse-client
 
 Unofficial TypeScript SDK for text chat with your Muse, using the open-source
 [Muse Gadget SDK](https://github.com/facebookincubator/muse-gadget-sdk) protocol.
@@ -9,7 +9,11 @@ Bluetooth pairing.
 
 ## CLI example
 
+The CLI is a repository example. Clone the project to run it:
+
 ```sh
+git clone https://github.com/wong2/muse-client.git
+cd muse-client
 bun install
 bun run build
 bun run cli pair
@@ -41,7 +45,7 @@ Tokens are never printed by the CLI.
 5. Wait for `Paired successfully`, then run `bun run cli chat`.
 
 The SDK compiles and caches its native transport under
-`~/Library/Caches/muse-ts/bluetooth/`. Credential files use mode `0600` and new state
+`~/Library/Caches/muse-client/bluetooth/`. Credential files use mode `0600` and new state
 directories use `0700`. The app advertises only while this command is running;
 the setup window closes after ten minutes. Ctrl+C cancels and closes the helper.
 
@@ -65,7 +69,7 @@ phone in a trusted environment.
 Programmatic pairing is available from a separate entry point:
 
 ```ts
-import { pairMacOS } from 'muse-ts/pairing';
+import { pairMacOS } from 'muse-client/pairing';
 
 const credentials = await pairMacOS({
   sdkToken: process.env.MUSE_SDK_TOKEN, // Or omit to read the saved sdk_token file.
@@ -104,13 +108,13 @@ without sending a message. It does not prove that a model response will arrive.
 
 ## SDK usage
 
-The package is local and has not been published. After building, import from
-`./dist/index.mjs`, or link/install this folder into your application and import
-from `muse-ts`.
+```sh
+npm install muse-client
+```
 
 ```ts
-import { MuseClient } from 'muse-ts';
-import { loadCredentials, saveCredentials } from 'muse-ts/credentials';
+import { MuseClient } from 'muse-client';
+import { loadCredentials, saveCredentials } from 'muse-client/credentials';
 
 const client = await MuseClient.connect({
   credentials: await loadCredentials(),
@@ -150,7 +154,7 @@ Use `reply_to_message_id` / `parent_message_id` in event payloads and the return
 acknowledgement to correlate replies when needed.
 
 ```ts
-import { MuseAccount } from 'muse-ts';
+import { MuseAccount } from 'muse-client';
 
 const account = new MuseAccount({
   credentials: {
@@ -178,7 +182,7 @@ const vms = await account.listVMs(); // Includes sensitive per-VM authToken valu
 | `client.subscribe({ sessionId?, signal? })` | Receive an async iterable of chat events with `close()` |
 | `client.close()` | Close the socket and reject pending operations |
 | `loadCredentials(directory?)` / `saveCredentials(credentials, directory?)` | Read/update existing gadget pairing files |
-| `unpair(directory?)` (from `muse-ts/credentials`) | Remove local pairing credentials; return whether a pairing was removed |
+| `unpair(directory?)` (from `muse-client/credentials`) | Remove local pairing credentials; return whether a pairing was removed |
 | `pairMacOS({ directory?, sdkToken?, probe?, signal?, onProgress? })` | Authorize this Mac through the phone app; probe returns undefined |
 | `buildPairingHelper()` | Compile the bundled Swift transport without starting Bluetooth |
 
@@ -231,8 +235,9 @@ and a side chat. A new side-chat subscription was observed to return 404 until
 the first message created that session. These are observed results, not a
 promise of future endpoint stability.
 
-Pairing has passed offline protocol tests and macOS advertising verification.
-The complete phone-to-credential flow still needs real-device validation.
+macOS pairing was also confirmed manually on 2026-10-03. The phone must be able
+to reach `hatch-api.meta.ai` to obtain device credentials; a working chat
+connection alone does not verify access to that endpoint.
 
 ## License and service access
 

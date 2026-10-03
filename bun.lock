@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "muse-ts",
+      "name": "muse-client",
       "dependencies": {
         "ws": "^8.22.0",
       },
