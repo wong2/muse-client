@@ -1,116 +1,78 @@
 # muse-client
 
-Unofficial TypeScript SDK for text chat with your Muse, using the open-source
+Unofficial TypeScript SDK for chatting with [Muse](https://muse.ai), based on the
 [Muse Gadget SDK](https://github.com/facebookincubator/muse-gadget-sdk) protocol.
+Supports streaming text chat, VM lookup, token refresh, and macOS Bluetooth pairing.
 
-The SDK implements account/VM lookup, device-token refresh, the Noise XX
-WebSocket transport, sending messages, streaming chat subscriptions, and macOS
-Bluetooth pairing.
+Requires Node.js 22.18 or later. Pairing supports macOS; chat also runs on Linux.
 
-## CLI example
-
-The CLI is a repository example. Clone the project to run it:
+## Install
 
 ```sh
-git clone https://github.com/wong2/muse-client.git
-cd muse-client
+npm install muse-client
+```
+
+## Pair with Muse
+
+Pairing requires Xcode Command Line Tools (`xcode-select --install`) and a personal
+[SDK token](https://gadgets.muse.ai/settings/sdk-tokens).
+
+From the project directory:
+
+```sh
 bun install
-bun run build
 bun run cli pair
-bun run cli check
-bun run cli chat
 ```
 
-`pair` performs first-time authorization using the Muse phone app. If this Mac
-is already paired, it preserves your credentials and tells you to run `chat`.
-Pairing credentials are stored outside the repository:
+1. Paste your SDK token when prompted and allow Bluetooth access.
+2. In the Muse phone app, enable **Settings > Devices > Developer mode**, then
+   choose **Add Device**.
+3. Select the printed `MuseGadgetXXXXXX` name, confirm, and choose
+   **Use current connection** for Wi-Fi.
+4. Wait for `Paired successfully`.
 
-- macOS: `~/Library/Application Support/MuseGadgetPair/`
-- Linux: `/var/lib/musegadget/`
-- Override: `--credentials /path/to/directory`
+The phone must be able to reach `hatch-api.meta.ai` to obtain device credentials.
+If pairing fails after selecting a network, check the phone's network or proxy rules.
 
-The directory contains `identity.json`, `pairing.json`, and `sdk_token`.
-Tokens are never printed by the CLI.
-
-### First-time pairing on macOS
-
-1. Install Xcode Command Line Tools if needed: `xcode-select --install`.
-2. Run `bun run cli pair`. If no token is saved, paste your personal
-   [SDK token](https://gadgets.muse.ai/settings/sdk-tokens) into the hidden prompt.
-3. Allow Bluetooth access when macOS asks. In the Muse phone app enable
-   Settings > Devices > Developer mode, then Add Device.
-4. Select the printed `MuseGadgetXXXXXX` name and confirm the community-device
-   prompt. Select **Use current connection** when asked for Wi-Fi; the Mac's
-   network settings are not changed.
-5. Wait for `Paired successfully`, then run `bun run cli chat`.
-
-The SDK compiles and caches its native transport under
-`~/Library/Caches/muse-client/bluetooth/`. Credential files use mode `0600` and new state
-directories use `0700`. The app advertises only while this command is running;
-the setup window closes after ten minutes. Ctrl+C cancels and closes the helper.
-
-```sh
-# Discovery test only: no token or account changes.
-bun run cli pair --probe
-
-# Read a token from a private file instead of prompting.
-bun run cli pair --sdk-token-file /path/to/sdk_token
-
-# Create a separate gadget without overwriting an existing pairing.
-bun run cli pair --credentials "$HOME/Library/Application Support/MyOtherMuseGadget"
-```
-
-Each credentials directory permits one pairing process at a time. If the process
-is forcibly killed, a `pair.lock` file may remain. Remove that file only after
-confirming no pairing process is still using the directory. Community pairing
-does not use a manufacturer certificate; complete authorization with your own
-phone in a trusted environment.
-
-Programmatic pairing is available from a separate entry point:
+For pairing from your own application:
 
 ```ts
 import { pairMacOS } from 'muse-client/pairing';
 
 const credentials = await pairMacOS({
-  sdkToken: process.env.MUSE_SDK_TOKEN, // Or omit to read the saved sdk_token file.
+  sdkToken: process.env.MUSE_SDK_TOKEN,
   onProgress: console.log,
 });
-// pairMacOS saves the result locally as well as returning it.
 ```
+
+Pairing saves credentials locally. The default directory is
+`~/Library/Application Support/MuseGadgetPair/` on macOS and `/var/lib/musegadget/`
+on Linux. Use `--credentials <directory>` in the CLI or `directory` in `pairMacOS`
+to choose another location. Existing pairings are preserved.
+
+## CLI example
+
+The CLI runs from the repository:
 
 ```sh
-bun run cli vms
-bun run cli chat --vm YOUR_VM_ID
-bun run cli chat --session YOUR_SESSION_ID
-bun run cli send "Hello Muse"
-bun run cli watch --json
+bun run cli chat                 # Interactive chat; /quit or Ctrl+C to exit
+bun run cli vms                  # List Muse VMs
+bun run cli check                # Check the connection without sending a message
+bun run cli send "Hello Muse"    # Send a message and print its acknowledgement
+bun run cli watch --json         # Stream chat events
+bun run cli unpair               # Remove local pairing credentials
 ```
 
-To reset local pairing, stop any running chat or pairing process, then run:
+Use `--vm <id>` to choose a VM, `--session <id>` for an existing side chat, and
+`--help` for all options.
 
-```sh
-npm run cli -- unpair
-npm run cli -- pair
-```
-
-`unpair` removes `pairing.json`, preserving the device identity and SDK token
-for re-pairing. It also supports `--credentials`. To remove the device from Muse,
-use **Settings > Devices** in the phone app.
-
-`chat` subscribes before accepting input, displays reply text as it arrives, and
-exits with `/quit` or Ctrl+C. Pass an existing side-chat ID with `--session` to
-continue it. `send` prints the message acknowledgement,
-not an assistant reply. `watch --json` prints full events, which can include
-private conversation content; redirect output only to a destination you trust.
-
-`check` verifies a real Noise connection and a successful chat subscription
-without sending a message. It does not prove that a model response will arrive.
+Before running `unpair`, stop any chat or pairing process. It preserves the device
+identity and SDK token. To remove the device association from Muse, use
+**Settings > Devices** in the phone app.
 
 ## SDK usage
 
-```sh
-npm install muse-client
-```
+After pairing:
 
 ```ts
 import { MuseClient } from 'muse-client';
@@ -122,7 +84,6 @@ const client = await MuseClient.connect({
 });
 
 try {
-  // Resolves only after the server accepts the subscription.
   const events = await client.subscribe();
   const reading = (async () => {
     for await (const event of events) {
@@ -131,82 +92,39 @@ try {
       }
     }
   })();
-  // Attach a rejection handler immediately; the subscription can disconnect.
-  reading.catch(() => {});
+  reading.catch(() => {}); // Handle early rejection while sendMessage is pending.
 
   const ack = await client.sendMessage('Hello!');
   console.log('Accepted message:', ack.messageId);
-  await reading; // Long-lived; close/abort the subscription when your UI exits.
+  await reading; // Streams until closed or aborted.
 } finally {
   client.close();
 }
 ```
 
-For an existing side chat, pass the **same** `sessionId` to `subscribe` and `sendMessage`.
-Sending with a new session ID creates a side chat, but subscribing before that
-session exists returns HTTP 404. The SDK does not silently create a session or
-send a message to work around this. Subscribe to an existing session before
-sending the next message; this API does not promise replay of earlier replies.
-The default subscription is for the main chat; it does not deliver side-chat
-reply text. The subscription is a session event feed, not a request-scoped
-completion iterator. Activity from another client in that session can appear.
-Use `reply_to_message_id` / `parent_message_id` in event payloads and the returned
-acknowledgement to correlate replies when needed.
+- Subscriptions default to the main chat. For an existing side chat, pass the same
+  `sessionId` to `subscribe` and `sendMessage`. A new side chat must be created by
+  sending its first message before subscribing.
+- Events may include activity from other clients in the same session. Message
+  completion does not necessarily mean the whole assistant turn has ended.
+- Persist refreshed credentials with `onCredentials`. Avoid concurrent processes
+  sharing the same credentials. The SDK does not automatically reconnect or resend.
 
-```ts
-import { MuseAccount } from 'muse-client';
+## API
 
-const account = new MuseAccount({
-  credentials: {
-    accessToken: '...',
-    refreshToken: '...',
-    deviceId: 'homelink-123abc',
-    sdkToken: 'mgst_...', // Optional for existing credentials; supplied on refresh.
-  },
-  onCredentials: async (next) => {
-    // Persist next.accessToken and next.refreshToken in your own secure store.
-  },
-});
-
-const vms = await account.listVMs(); // Includes sensitive per-VM authToken values.
-```
-
-## API and behavior
-
-| API | Purpose |
+| Import | Exports |
 | --- | --- |
-| `MuseAccount.listVMs()` | Fetch VMs; refresh on an expired device token |
-| `MuseAccount.refresh()` | Rotate tokens and await `onCredentials` persistence |
-| `MuseClient.connect({ credentials, vmId?, onCredentials? })` | Select a VM and establish Noise |
-| `client.sendMessage(text, { sessionId?, signal? })` | Send text and receive its acknowledgement |
-| `client.subscribe({ sessionId?, signal? })` | Receive an async iterable of chat events with `close()` |
-| `client.close()` | Close the socket and reject pending operations |
-| `loadCredentials(directory?)` / `saveCredentials(credentials, directory?)` | Read/update existing gadget pairing files |
-| `unpair(directory?)` (from `muse-client/credentials`) | Remove local pairing credentials; return whether a pairing was removed |
-| `pairMacOS({ directory?, sdkToken?, probe?, signal?, onProgress? })` | Authorize this Mac through the phone app; probe returns undefined |
-| `buildPairingHelper()` | Compile the bundled Swift transport without starting Bluetooth |
+| `muse-client` | `MuseClient`, `MuseAccount` |
+| `muse-client/credentials` | `loadCredentials`, `saveCredentials`, `unpair` |
+| `muse-client/pairing` | `pairMacOS`, `buildPairingHelper`, `validateSDKToken` |
 
-- Uses `Noise_XX_25519_AESGCM_SHA256` over a TLS WebSocket. TLS and the per-VM
-  bearer authenticate the gateway; the ephemeral Noise handshake does not pin a
-  long-lived server identity.
-- Rotates an aged device token at VM lookup (three-hour threshold when `savedAt`
-  is known), or once on HTTP 401. Refreshes are coalesced within one account
-  instance. Always persist rotated tokens; avoid concurrent processes sharing
-  the same refresh-token file. Long-running sockets use their established session;
-  refreshing happens when making a new connection, not on a background timer.
-- Re-fetches VM credentials once if the WebSocket upgrade returns 401/403.
-  Does not automatically reconnect or resend messages, avoiding duplicate turns.
-- `sendMessage` has a 60-second timeout; connections and response headers have
-  20-second timeouts. Subscriptions stay open until closed, aborted, or disconnected.
-- There is no reliable end-of-turn event in the inspected protocol. Individual
-  assistant messages have completion events; a turn can contain several messages.
-- No local shell commands, file access tools, or device control commands are
-  registered with Muse. This SDK connects directly to the chat endpoints.
-- Bluetooth pairing currently supports macOS only; chat also runs on Linux.
-- Audio, attachments, history listing, and independent account login
-  are outside the current implementation.
+`MuseClient` provides `connect`, `sendMessage`, `subscribe`, and `close`.
+`MuseAccount` provides `listVMs` and `refresh`.
 
-## Development and validation
+Audio, attachments, history listing, and independent account login are not supported.
+The SDK does not expose local shell commands or device controls to Muse.
+
+## Development
 
 ```sh
 bun run typecheck
@@ -214,35 +132,11 @@ bun run test
 bun run build
 ```
 
-Offline tests cover independent Python-generated Noise vectors, tampering and
-replay rejection, protobuf/chunk validation, token refresh, and private credential
-storage. Pairing tests match the upstream public v5 vectors and simulate the
-full encrypted phone flow, rejected credentials, storage failure, replay,
-expiry, and disconnect during verification. The optional live **local** interoperability test uses the upstream
-Python responder; it needs no Muse account and makes no external connections:
+The optional upstream interoperability test requires `MUSE_GADGET_SDK` and
+`MUSE_TEST_PYTHON`; it is skipped when these are unset.
 
-```sh
-MUSE_GADGET_SDK=/path/to/muse-gadget-sdk \
-MUSE_TEST_PYTHON=/path/to/python-with-cryptography-and-websockets \
-bun run test
-```
+## License
 
-Without those variables, that one test is skipped.
-
-Live validation on 2026-10-03: imported the macOS pairing credentials, connected
-to a real Muse VM, and received the requested test replies in both the main chat
-and a side chat. A new side-chat subscription was observed to return 404 until
-the first message created that session. These are observed results, not a
-promise of future endpoint stability.
-
-macOS pairing was also confirmed manually on 2026-10-03. The phone must be able
-to reach `hatch-api.meta.ai` to obtain device credentials; a working chat
-connection alone does not verify access to that endpoint.
-
-## License and service access
-
-Apache-2.0. Portions of the protocol implementation are adapted from Meta's
-Muse Gadget SDK; see `NOTICE` and `LICENSE`. This project is unofficial. Muse
-service access is governed separately by the
-[Gadget SDK Terms](https://gadgets.muse.ai/sdk-terms), and these endpoints are not
-a guaranteed stable public developer API.
+Apache-2.0; see `LICENSE` and `NOTICE`. This project is unofficial and is not
+affiliated with Meta. Muse service access is subject to the
+[Gadget SDK Terms](https://gadgets.muse.ai/sdk-terms).
