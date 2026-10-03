@@ -1,0 +1,10 @@
+muse-ts is an unofficial client, not affiliated with or endorsed by Meta.
+
+The Noise protocol, pairing v5 implementation, public pairing test vector,
+and Muse wire protocol were adapted from:
+https://github.com/facebookincubator/muse-gadget-sdk
+Copyright (c) Meta Platforms, Inc. and affiliates.
+Licensed under the Apache License, Version 2.0.
+
+Modifications: TypeScript port, Node.js transport, async chat subscription API,
+credential-file adapter, macOS Bluetooth helper, and CLI example.

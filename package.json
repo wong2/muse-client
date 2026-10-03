@@ -1,0 +1,29 @@
+{
+  "name": "muse-ts",
+  "version": "0.1.0",
+  "description": "Unofficial TypeScript client for Muse gadget chat",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=22.18.0" },
+  "exports": {
+    ".": { "types": "./dist/index.d.mts", "import": "./dist/index.mjs" },
+    "./credentials": { "types": "./dist/credentials.d.mts", "import": "./dist/credentials.mjs" },
+    "./pairing": { "types": "./dist/pairing.d.mts", "import": "./dist/pairing.mjs" }
+  },
+  "files": ["dist", "native", "README.md", "LICENSE", "NOTICE"],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "cli": "tsx examples/cli.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": { "ws": "^8.22.0" },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/ws": "^8.18.2",
+    "tsdown": "^0.23.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
