@@ -76,7 +76,9 @@ test('completion waits for every reply and a terminal task or quiet period', () 
   assert.equal(turn.complete(), true);
 });
 
-test('terminal tasks preceding blank or missing replies allow reordered text to arrive', () => {
+test('terminal tasks preceding blank or missing replies allow reordered text to arrive', (t) => {
+  // Subtracting this timestamp from its deadline rounds below the full grace period.
+  t.mock.method(performance, 'now', () => 24.0003);
   const turn = shared();
   turn.feed(event('task.status', { reply_to_message_id: 'u1', status: 'completed' }));
   assert.equal(turn.complete(turn.lastActivity + 2999), false);

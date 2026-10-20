@@ -252,10 +252,10 @@ export class MuseTurn {
     const replies = [...this.messages.values()].filter((reply) => reply.bound);
     if (replies.some((reply) => !reply.done)) return Infinity;
     if (replies.some((reply) => reply.text.trim())) {
-      return this.finished ? 0 : Math.max(0, QUIET_MS - (now - this.last));
+      return this.finished ? 0 : Math.max(0, this.last + QUIET_MS - now);
     }
     // A terminal task may precede its reply; allow reordered text to arrive.
-    return this.finished ? Math.max(0, (replies.length ? 1000 : QUIET_MS) - (now - this.last)) : Infinity;
+    return this.finished ? Math.max(0, this.last + (replies.length ? 1000 : QUIET_MS) - now) : Infinity;
   }
   complete(now = performance.now()): boolean { return this.completionDelay(now) === 0; }
   retire(): void {
