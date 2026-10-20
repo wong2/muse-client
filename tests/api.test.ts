@@ -51,3 +51,29 @@ test('invalid VM payloads and insecure API URLs fail explicitly', async () => {
   await assert.rejects(new MuseAccount({ credentials, fetch: async () => Response.json({}) }).listVMs(), /vm_list/);
   await assert.rejects(new MuseAccount({ credentials: { ...credentials, apiUrl: 'http://example.test' } }).listVMs(), /HTTPS/);
 });
+
+test('changed SDK token warns once without refreshing or changing the paired hint', async () => {
+  const warnings: string[] = [], paths: string[] = [];
+  const token = 'mgst_' + 'B'.repeat(43);
+  const account = new MuseAccount({
+    credentials: { ...credentials, sdkToken: token, sdkTokenHint: 'mgst_AAAAAAA' },
+    onWarning: (message) => warnings.push(message),
+    fetch: async (url) => {
+      paths.push(new URL(String(url)).pathname);
+      return Response.json({ vm_list: [] });
+    },
+  });
+  await account.listVMs(); await account.listVMs();
+  assert.deepEqual(paths, ['/fetch_vms', '/fetch_vms']);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /unpair.*pair/);
+  assert.ok(!warnings[0]!.includes(token));
+  assert.equal(account.credentials.sdkTokenHint, 'mgst_AAAAAAA');
+});
+
+test('matching and legacy unknown SDK token hints do not warn', () => {
+  for (const sdkTokenHint of [undefined, credentials.sdkToken]) {
+    new MuseAccount({ credentials: { ...credentials, sdkTokenHint },
+      onWarning: () => assert.fail('Unexpected warning') });
+  }
+});

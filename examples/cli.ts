@@ -2,7 +2,7 @@
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline';
 import { MuseAccount, MuseClient } from '../src/index.js';
-import type { ChatEvent } from '../src/index.js';
+import type { ChatEvent, Reply } from '../src/index.js';
 import { defaultCredentialsDirectory, loadCredentials, saveCredentials, unpair } from '../src/credentials.js';
 
 const HELP = `Muse CLI example
@@ -26,7 +26,8 @@ Options:
   --help                      Show this help
 
 In chat: /quit exits. Ctrl+C exits.
-Subscription events can include conversations from other Muse clients.
+Watch events can include conversations from other Muse clients.
+Chat follows bound replies to each request; --json prints typed turn events.
 Pairing requires macOS and Xcode Command Line Tools.
 `;
 
@@ -49,6 +50,20 @@ function printEvent(event: ChatEvent, seen: Map<string, string>): void {
     seen.set(id, text || previous || '');
   }
   if (seen.size > 1000) seen.delete(seen.keys().next().value!);
+}
+
+function printReply(reply: Reply, seen: Map<string, string>, finished: Set<string>): void {
+  const previous = seen.get(reply.messageId);
+  if (previous === undefined && reply.text) process.stdout.write(`\nMuse: ${reply.text}`);
+  else if (reply.text !== previous) {
+    process.stdout.write(reply.text.startsWith(previous ?? '')
+      ? reply.text.slice((previous ?? '').length) : `\nMuse (final): ${reply.text}`);
+  }
+  // Wait for text before marking the message as printed.
+  if (reply.text) seen.set(reply.messageId, reply.text);
+  if (reply.done && reply.text && !finished.has(reply.messageId)) {
+    process.stdout.write('\n'); finished.add(reply.messageId);
+  }
 }
 
 async function main(): Promise<void> {
@@ -76,6 +91,7 @@ async function main(): Promise<void> {
   }
   const credentials = await loadCredentials(directory);
   const options = { credentials, vmId: values.vm,
+    onWarning: (message: string) => console.error(`Warning: ${message}`),
     onCredentials: (next: typeof credentials) => saveCredentials(next, directory) };
   if (command === 'vms') {
     const vms = await new MuseAccount(options).listVMs();
@@ -97,6 +113,29 @@ async function main(): Promise<void> {
       console.log(`Accepted: ${result.messageId}`);
       return;
     }
+    if (command === 'chat') {
+      input = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) });
+      input.on('line', (line: string) => { if (line.trim() === '/quit') stop(); });
+      if (sessionId) console.error(`Side chat: ${sessionId}`);
+      console.error('Type a message. /quit exits.');
+      for await (const line of input) {
+        if (closing) break;
+        const text = line.trim();
+        if (!text) continue;
+        if (text === '/quit') break;
+        const seen = new Map<string, string>(), finished = new Set<string>();
+        try {
+          for await (const event of client.chat(text, { sessionId, signal: controller.signal })) {
+            if (values.json) console.log(JSON.stringify(event));
+            else if (event.type === 'reply') printReply(event, seen, finished);
+            else if (event.type === 'agent-status' && event.activityText) console.error(event.activityText);
+          }
+        } catch (error) {
+          if (!closing) console.error(error instanceof Error ? error.message : 'Chat failed');
+        }
+      }
+      return;
+    }
     const events = await client.subscribe({ signal: controller.signal, sessionId });
     if (command === 'check') {
       console.log('Noise connection and chat subscription established.');
@@ -115,22 +154,6 @@ async function main(): Promise<void> {
         if (!closing) { console.error(error instanceof Error ? error.message : 'Subscription failed'); process.exitCode = 1; stop(); }
       }
     })();
-    if (command === 'watch') { await watching; return; }
-    input = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) });
-    if (sessionId) console.error(`Side chat: ${sessionId}`);
-    console.error('Type a message. /quit exits.');
-    for await (const line of input) {
-      const text = line.trim();
-      if (!text) continue;
-      if (text === '/quit') break;
-      try {
-        const ack = await client.sendMessage(text, { sessionId, signal: controller.signal });
-        console.error(`Sent: ${ack.messageId}`);
-      } catch (error) {
-        if (!closing) console.error(error instanceof Error ? error.message : 'Send failed');
-      }
-    }
-    stop();
     await watching;
   } finally {
     stop();

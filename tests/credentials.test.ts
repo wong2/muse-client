@@ -47,3 +47,23 @@ test('unpair respects an active pairing lock', async () => {
     assert.equal(await readFile(join(directory, 'pair.lock'), 'utf8'), 'existing lock');
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test('paired SDK token hint survives load, token rotation and a changed token file', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'muse-client-token-'));
+  try {
+    const hint = 'mgst_AAAAAAA';
+    await writeFile(join(directory, 'identity.json'), JSON.stringify({ mac: '02:00:00:ab:cd:ef' }));
+    await saveCredentials({ accessToken: 'a', refreshToken: 'r', deviceId: 'homelink-abcdef', sdkTokenHint: hint }, directory);
+    await writeFile(join(directory, 'sdk_token'), 'mgst_' + 'B'.repeat(43));
+    const credentials = await loadCredentials(directory);
+    assert.equal(credentials.sdkTokenHint, hint);
+    assert.equal(credentials.sdkToken, 'mgst_' + 'B'.repeat(43));
+    await saveCredentials({ ...credentials, accessToken: 'rotated' }, directory);
+    assert.equal((await loadCredentials(directory)).sdkTokenHint, hint);
+    // Older callers must preserve the stored hint, not replace it with today's token.
+    await saveCredentials({ ...credentials, sdkTokenHint: undefined }, directory);
+    assert.equal((await loadCredentials(directory)).sdkTokenHint, hint);
+    await writeFile(join(directory, 'pairing.json'), JSON.stringify({ access_token: 'old', refresh_token: 'old' }));
+    assert.equal((await loadCredentials(directory)).sdkTokenHint, undefined);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

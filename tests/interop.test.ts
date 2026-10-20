@@ -35,6 +35,12 @@ test('independent Python peer: multiplexing, chunking, cancellation, resets and 
     }));
     assert.deepEqual(replies, Array.from({ length: 8 }, (_, index) => ({ index, text: '你好' })));
     assert.deepEqual(await collect(await connection.open('/split', {})), Buffer.alloc(180000, 'x'));
+    const slowConsumer = await connection.open('/overflow', {});
+    // This response follows the flood on the wire, so the overflowing stream has failed.
+    const healthy = await connection.open('/echo', { still: 'connected' });
+    assert.deepEqual(JSON.parse((await collect(healthy)).toString()), { still: 'connected' });
+    await assert.rejects(collect(slowConsumer), /consumer is too slow/);
+    assert.equal(JSON.parse((await collect(await connection.open('/reset-count', {}))).toString()).count, 1);
     await assert.rejects(connection.open('/noheaders', {}, { signal: AbortSignal.timeout(30) }), /cancelled/);
     const abort = new AbortController();
     const slow = await connection.open('/slow', {}, { signal: abort.signal });

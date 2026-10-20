@@ -6,6 +6,8 @@ export interface DeviceCredentials {
   /** The node_id used during pairing, e.g. homelink-123abc. */
   deviceId: string;
   sdkToken?: string;
+  /** First 12 characters of the SDK token used when this device paired. */
+  sdkTokenHint?: string;
   apiUrl?: string;
   noiseHost?: string;
   savedAt?: number;
@@ -21,6 +23,8 @@ export interface AccountOptions {
   credentials: DeviceCredentials;
   /** Must durably save rotated tokens before resolving. */
   onCredentials?: (credentials: DeviceCredentials) => Promise<void> | void;
+  /** Non-fatal configuration warnings; never contains a full token. */
+  onWarning?: (message: string) => void;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -40,6 +44,10 @@ export class MuseAccount {
     this.current = { ...options.credentials };
     requiredString(this.current.accessToken, 'access token');
     requiredString(this.current.deviceId, 'device ID');
+    if (this.current.sdkTokenHint && this.current.sdkToken
+        && this.current.sdkTokenHint !== this.current.sdkToken.trim().slice(0, 12)) {
+      options.onWarning?.('The SDK token has changed since pairing. Refreshing device credentials does not change the SDK token associated with this device. Run cli unpair, then cli pair with the new token.');
+    }
   }
   get credentials(): DeviceCredentials { return { ...this.current }; }
   private async call(path: string, token: string, body?: unknown): Promise<unknown> {

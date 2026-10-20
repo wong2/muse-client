@@ -25,6 +25,7 @@ async def handle(ws):
     noise.read_message3(await ws.recv())
     tx, rx = noise.split()
     assembler = NoiseFrameDecoder()
+    resets = set()
 
     async def send(frame, reverse=False):
         chunks = encode_noise_frames(encode_response_envelope(frame))
@@ -39,6 +40,7 @@ async def handle(ws):
             continue
         frame = decode_request_envelope(plain)
         if frame.kind == "reset":
+            resets.add(frame.stream_id)
             continue
         assert frame.kind == "request"
         request = frame.value
@@ -57,6 +59,15 @@ async def handle(ws):
         if request.path == "/split":
             await send(ServiceFrame.response(frame.stream_id, ApplicationResponse(status=200)))
             await send(ServiceFrame.body_chunk(frame.stream_id, BodyChunk(data=b"x" * 180000, end_body=True)), reverse=True)
+            continue
+        if request.path == "/overflow":
+            await send(ServiceFrame.response(frame.stream_id, ApplicationResponse(status=200)))
+            for _ in range(40):
+                await send(ServiceFrame.body_chunk(frame.stream_id, BodyChunk(data=b"x" * 131072)))
+            continue
+        if request.path == "/reset-count":
+            await send(ServiceFrame.response(frame.stream_id, ApplicationResponse(
+                status=200, body=json.dumps({"count": len(resets)}).encode(), end_body=True)))
             continue
         await send(ServiceFrame.response(frame.stream_id, ApplicationResponse(status=200, body=request.body, end_body=True)))
 

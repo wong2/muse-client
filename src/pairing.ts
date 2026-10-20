@@ -147,7 +147,8 @@ export async function pairMacOS(options: PairMacOSOptions = {}): Promise<DeviceC
           if (existsSync(join(directory, 'pairing.json'))) throw new MuseError('Pairing already exists');
           writePrivate(join(directory, 'pairing.json'), JSON.stringify({ access_token: value.accessToken,
             refresh_token: value.refreshToken, token_type: 'device', api_url_v2: value.apiUrl ?? '',
-            noise_host: value.noiseHost ?? '', access_token_saved_at: value.savedAt }, null, 2));
+            noise_host: value.noiseHost ?? '', access_token_saved_at: value.savedAt,
+            sdk_token_hint: value.sdkTokenHint }, null, 2));
         },
         complete: (value) => { completed = true; credentials = value; send({ event: 'complete' }); },
         failed: (error) => finish(error),

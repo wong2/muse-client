@@ -10,14 +10,19 @@ class BodyQueue implements AsyncIterable<Buffer> {
   private ended = false;
   private error?: Error;
   private wake?: () => void;
-  push(chunk: Buffer): void {
-    if (!chunk.length || this.ended) return;
-    if (this.size + chunk.length > 4 * 1024 * 1024) throw new MuseProtocolError('Response consumer is too slow');
+  push(chunk: Buffer): boolean {
+    if (!chunk.length || this.ended) return true;
+    if (this.size + chunk.length > 4 * 1024 * 1024) return false;
     this.chunks.push(chunk);
     this.size += chunk.length;
     this.wake?.();
+    return true;
   }
-  end(error?: Error): void { this.ended = true; this.error = error; this.wake?.(); }
+  end(error?: Error): void {
+    this.ended = true; this.error = error;
+    if (error) { this.chunks = []; this.size = 0; }
+    this.wake?.();
+  }
   async *[Symbol.asyncIterator](): AsyncGenerator<Buffer> {
     while (true) {
       if (this.error) throw this.error;
@@ -122,7 +127,11 @@ export class NoiseConnection {
       clearTimeout(pending.headersTimer);
       pending.resolve(frame.status!);
     } else if (pending.status === undefined) throw new MuseProtocolError('Body arrived before headers');
-    pending.queue.push(frame.body);
+    if (!pending.queue.push(frame.body)) {
+      this.finish(frame.streamId, new MuseError('Response consumer is too slow'));
+      this.transmit(resetFrame(frame.streamId));
+      return;
+    }
     if (frame.end) this.finish(frame.streamId);
   }
 

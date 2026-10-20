@@ -49,6 +49,8 @@ export async function loadCredentials(directory = defaultCredentialsDirectory())
     accessToken: requiredString(pairing.access_token, 'device access token'),
     refreshToken: requiredString(pairing.refresh_token, 'device refresh token'),
     deviceId: `homelink-${mac.replaceAll(':', '').slice(-6)}`, sdkToken,
+    sdkTokenHint: typeof pairing.sdk_token_hint === 'string' && pairing.sdk_token_hint.length === 12
+      ? pairing.sdk_token_hint : undefined,
     apiUrl: typeof pairing.api_url_v2 === 'string' ? pairing.api_url_v2 || undefined : undefined,
     noiseHost: typeof pairing.noise_host === 'string' ? pairing.noise_host || undefined : undefined,
     savedAt: typeof pairing.access_token_saved_at === 'number' ? pairing.access_token_saved_at : undefined,
@@ -63,6 +65,7 @@ export async function saveCredentials(credentials: DeviceCredentials, directory 
   try { previous = object(JSON.parse(await readFile(path, 'utf8'))); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   const data = { ...previous, access_token: credentials.accessToken, refresh_token: credentials.refreshToken,
+    ...(credentials.sdkTokenHint !== undefined ? { sdk_token_hint: credentials.sdkTokenHint } : {}),
     token_type: 'device', api_url_v2: credentials.apiUrl ?? '', noise_host: credentials.noiseHost ?? '',
     access_token_saved_at: credentials.savedAt ?? Math.floor(Date.now() / 1000) };
   const temporary = `${path}.${randomUUID()}.tmp`;

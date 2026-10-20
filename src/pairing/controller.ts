@@ -89,6 +89,7 @@ export class PairingController {
         accessToken: requiredString(command.access_token, 'device access token'),
         refreshToken: requiredString(command.refresh_token, 'device refresh token'),
         deviceId: session.identity.nodeId, sdkToken: this.options.sdkToken,
+        sdkTokenHint: this.options.sdkToken?.trim().slice(0, 12),
         apiUrl: typeof command.api_url_v2 === 'string' ? command.api_url_v2 || undefined : undefined,
         noiseHost: typeof command.noise_host === 'string' ? command.noise_host || undefined : undefined,
         savedAt: Math.floor(Date.now() / 1000),

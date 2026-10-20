@@ -4,6 +4,11 @@ import { NoiseConnection } from './connection.js';
 import { MuseError, MuseHttpError, MuseProtocolError } from './errors.js';
 import { decodeChatEvents } from './events.js';
 import type { ChatEvent } from './events.js';
+import { ReplayScope } from './turn.js';
+import type { TurnEvent } from './turn.js';
+import { followTurn } from './turn-stream.js';
+import type { ChatOptions } from './turn-stream.js';
+export type { ChatOptions } from './turn-stream.js';
 export type { ChatEvent } from './events.js';
 
 export interface ChatAcknowledgement {
@@ -17,6 +22,8 @@ export interface SubscribeOptions { sessionId?: string; signal?: AbortSignal }
 
 /** A text-chat connection to a Muse VM. No local shell commands are registered. */
 export class MuseClient {
+  private readonly replayScope = new ReplayScope();
+  private readonly ownedChats = new Set<string>();
   private constructor(
     private readonly connection: NoiseConnection,
     public readonly vm: Omit<MuseVM, 'authToken'>,
@@ -65,6 +72,20 @@ export class MuseClient {
       return { messageId: requiredString(result.message_id, 'message acknowledgement ID'),
         replyToMessageId: typeof result.reply_to_message_id === 'string' ? result.reply_to_message_id : undefined, raw };
     } finally { response.close(); }
+  }
+
+  /** Follow one request through its replies. Side chats must already exist.
+   * Only bound replies are yielded; ownsChat allows parentless replies in an exclusive side chat.
+   */
+  async *chat(message: string, options: ChatOptions = {}): AsyncGenerator<TurnEvent> {
+    const owned = options.ownsChat ? options.sessionId : undefined;
+    if (owned && this.ownedChats.has(owned)) throw new MuseError('An owned chat already has an active turn');
+    if (owned) this.ownedChats.add(owned);
+    try {
+      yield* followTurn(this, message, { ...options, replayScope: options.replayScope ?? this.replayScope });
+    } finally {
+      if (owned) this.ownedChats.delete(owned);
+    }
   }
 
   /** Opens the subscription before resolving; call this before sendMessage().

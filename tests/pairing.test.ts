@@ -95,7 +95,7 @@ const provision = { action: 'provision_v2', ssid: 'ignored', password: '', token
 test('complete phone flow verifies before saving and returns encrypted auth_ok', async () => {
   let verified = false;
   const h = harness({ verify: async (c) => { assert.equal(c.accessToken, 'device-access'); verified = true; },
-    save: () => { assert.ok(verified); } });
+    save: (c) => { assert.ok(verified); assert.equal(c.sdkTokenHint, sdkToken.slice(0, 12)); } });
   await h.send({ action: 'get_device_info' });
   assert.equal(h.messages[0]?.node_id, vector.node_id);
   await h.send(hello); await h.send(finished);
