@@ -2,7 +2,7 @@
 
 Unofficial TypeScript SDK for chatting with [Muse](https://muse.ai), based on the
 [Muse Gadget SDK](https://github.com/facebookincubator/muse-gadget-sdk) protocol.
-Supports streaming text chat, VM lookup, token refresh, and macOS Bluetooth pairing.
+Supports streaming chat, image messages, VM lookup, token refresh, and macOS Bluetooth pairing.
 
 Requires Node.js 22.18 or later. Pairing supports macOS; chat also runs on Linux.
 
@@ -134,6 +134,59 @@ sending and pass the same `sessionId` to both. Raw subscriptions may include oth
 clients' activity. A slow consumer exceeding its 4 MiB response buffer fails and
 resets only that request, leaving other streams on the connection usable.
 
+### Sending images
+
+Both `chat()` and `sendMessage()` accept `images`. Text and all images are sent in
+one request and belong to the same turn. Pass an empty string to send only images.
+Existing text-only calls are unchanged.
+
+Pass `File` objects directly; the SDK reads their names, MIME types and contents:
+
+```ts
+await client.sendMessage('What is in this picture?', { images: [file] });
+// Also supported: client.chat('What is in this picture?', { images: [file] })
+```
+
+`images` has type `readonly ImageInput[]`, where `ImageInput` is
+`File | ImageAttachment`. You can mix both types in the same request. If a File's
+`type` is empty, the SDK infers it from common image extensions (JPEG, PNG, WebP,
+GIF, AVIF, BMP, HEIC, HEIF, TIFF). For other extensions, set an `image/*` MIME type
+when creating the File. Actual format acceptance depends on the Muse service.
+
+For raw bytes, use `ImageAttachment`:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import type { ImageAttachment } from 'muse-client';
+
+const images: ImageAttachment[] = [{
+  data: await readFile('photo.jpg'),
+  mimeType: 'image/jpeg',
+  filename: 'photo.jpg',
+}];
+
+for await (const event of client.chat('What is in this picture?', { images })) {
+  if (event.type === 'reply' && event.done) console.log(event.text);
+}
+
+// Alternatively, send and receive only the acknowledgement:
+const acknowledgement = await client.sendMessage('', { images });
+```
+
+`data` contains raw `Uint8Array` or `Buffer` bytes; the SDK base64-encodes them.
+It does not fetch URLs, read paths, or resize images. Supply the correct `mimeType`
+and a non-empty `filename`. Empty images and non-image MIME types are rejected.
+The total JSON request (including base64, text, and metadata) is limited to
+255 KiB, reserving 1 KiB for the transport envelope within Muse's 256 KiB limit.
+Base64 adds roughly one third to the image size, so aim below 190 KiB of image
+data in total, with additional room for text and metadata.
+
+This uses `/chat/stream` file and text `items`, as demonstrated in upstream
+[PR #197](https://github.com/facebookincubator/muse-gadget-sdk/pull/197) and
+[PR #219](https://github.com/facebookincubator/muse-gadget-sdk/pull/219). The text
+is also included as an item because Muse ignores the top-level `message` when
+images are attached. Image items are not yet a documented Muse API contract.
+
 For custom event loops, `MuseTurn` exposes the tracking state separately:
 
 ```ts
@@ -167,7 +220,7 @@ Times passed to `complete(now)` use `performance.now()` milliseconds.
 Both accept `onWarning` to report an SDK token change since pairing. The warning
 does not block chat or trigger a token refresh.
 
-Audio, attachments, history listing, and independent account login are not supported.
+Audio, non-image attachments, history listing, and independent account login are not supported.
 The SDK does not expose local shell commands or device controls to Muse.
 
 ## Development

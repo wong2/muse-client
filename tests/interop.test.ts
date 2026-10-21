@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { NoiseConnection } from '../src/connection.js';
 import type { MuseResponse } from '../src/connection.js';
+import { chatRequest } from '../src/message.js';
 
 test('independent Python peer: multiplexing, chunking, cancellation, resets and disconnects', {
   skip: !process.env.MUSE_TEST_PYTHON || !process.env.MUSE_GADGET_SDK,
@@ -34,6 +35,11 @@ test('independent Python peer: multiplexing, chunking, cancellation, resets and 
       return JSON.parse((await collect(response)).toString());
     }));
     assert.deepEqual(replies, Array.from({ length: 8 }, (_, index) => ({ index, text: '你好' })));
+    // A realistic image request spans several encrypted outbound Noise frames.
+    const imageBody = await chatRequest('Describe this image', { images: [{
+      data: Buffer.alloc(180000, 0xab), filename: 'photo.jpg', mimeType: 'image/jpeg',
+    }] });
+    assert.deepEqual(JSON.parse((await collect(await connection.open('/echo', imageBody))).toString()), imageBody);
     assert.deepEqual(await collect(await connection.open('/split', {})), Buffer.alloc(180000, 'x'));
     const slowConsumer = await connection.open('/overflow', {});
     // This response follows the flood on the wire, so the overflowing stream has failed.

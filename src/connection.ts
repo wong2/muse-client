@@ -34,6 +34,9 @@ class BodyQueue implements AsyncIterable<Buffer> {
   }
 }
 
+// Leave room for the request envelope within Muse's 256 KiB limit.
+export const MAX_REQUEST_BODY_BYTES = 256 * 1024 - 1024;
+
 interface Pending {
   queue: BodyQueue;
   status?: number;
@@ -176,7 +179,7 @@ export class NoiseConnection {
       options.signal?.addEventListener('abort', close, { once: true });
       try {
         const encoded = Buffer.from(JSON.stringify(body));
-        if (encoded.length > 256 * 1024 - 1024) throw new MuseError('Muse request body is too large');
+        if (encoded.length > MAX_REQUEST_BODY_BYTES) throw new MuseError('Muse request body is too large');
         this.transmit(requestFrame(id, 'POST', path, encoded, {
           'Content-Type': 'application/json', accept: 'application/x-ndjson',
           'x-request-id': randomUUID(), 'x-app-id': 'hatch-web',

@@ -8,6 +8,8 @@ import { ReplayScope } from './turn.js';
 import type { TurnEvent } from './turn.js';
 import { followTurn } from './turn-stream.js';
 import type { ChatOptions } from './turn-stream.js';
+import { chatRequest } from './message.js';
+import type { MessageOptions } from './message.js';
 export type { ChatOptions } from './turn-stream.js';
 export type { ChatEvent } from './events.js';
 
@@ -17,10 +19,10 @@ export interface ChatAcknowledgement {
   raw: Record<string, unknown>;
 }
 export interface ConnectOptions extends AccountOptions { vmId?: string }
-export interface SendOptions { sessionId?: string; signal?: AbortSignal }
+export interface SendOptions extends MessageOptions { signal?: AbortSignal }
 export interface SubscribeOptions { sessionId?: string; signal?: AbortSignal }
 
-/** A text-chat connection to a Muse VM. No local shell commands are registered. */
+/** A chat connection to a Muse VM. No local shell commands are registered. */
 export class MuseClient {
   private readonly replayScope = new ReplayScope();
   private readonly ownedChats = new Set<string>();
@@ -52,12 +54,12 @@ export class MuseClient {
   }
 
   async sendMessage(message: string, options: SendOptions = {}): Promise<ChatAcknowledgement> {
-    if (!message.trim()) throw new MuseError('Message must not be empty');
     const timeout = AbortSignal.timeout(60000);
     const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
-    const response = await this.connection.open('/chat/stream', {
-      message, output_modality: 'text', ...(options.sessionId ? { session_id: options.sessionId } : {}),
-    }, { signal });
+    signal.throwIfAborted();
+    const body = await chatRequest(message, options);
+    signal.throwIfAborted();
+    const response = await this.connection.open('/chat/stream', body, { signal });
     try {
       if (response.status < 200 || response.status >= 300) throw new MuseHttpError(response.status, '/chat/stream');
       const chunks: Buffer[] = [];

@@ -1,4 +1,5 @@
 export { MuseClient } from './client.js';
+export type { ImageAttachment, ImageInput } from './message.js';
 export type { ChatEvent, ChatAcknowledgement, ConnectOptions, SendOptions, SubscribeOptions, ChatOptions } from './client.js';
 export { MuseTurn, ReplayScope, transcriptText } from './turn.js';
 export type { Reply, AgentStatus, TaskFinished, TurnEvent, TurnOptions } from './turn.js';

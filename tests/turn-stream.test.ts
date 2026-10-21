@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { followTurn } from '../src/turn-stream.js';
-import type { ChatAcknowledgement, ChatEvent } from '../src/client.js';
+import type { ChatAcknowledgement, ChatEvent, SendOptions } from '../src/client.js';
 
 function event(name: string, payload: Record<string, unknown>): ChatEvent {
   const raw = { type: 'event', event: name, payload: { session_id: 'chat', ...payload } };
@@ -12,6 +12,7 @@ function harness() {
   const queue: ChatEvent[] = [];
   let wake: (() => void) | undefined, ended = false, error: unknown;
   let subscribed = false, closed = false, sent = false;
+  let sentMessage: string | undefined, sentOptions: SendOptions | undefined;
   let accept!: (ack: ChatAcknowledgement) => void, reject!: (reason: Error) => void;
   const acknowledgement = new Promise<ChatAcknowledgement>((resolve, fail) => { accept = resolve; reject = fail; });
   void acknowledgement.catch(() => {});
@@ -21,6 +22,8 @@ function harness() {
     accept, reject,
     get closed() { return closed; },
     get sent() { return sent; },
+    get sentMessage() { return sentMessage; },
+    get sentOptions() { return sentOptions; },
     client: {
       async subscribe(options: { signal?: AbortSignal } = {}) {
         subscribed = true;
@@ -39,9 +42,10 @@ function harness() {
           },
         };
       },
-      async sendMessage() {
+      async sendMessage(message: string, options?: SendOptions) {
         assert.ok(subscribed, 'subscribe before sending');
         sent = true;
+        sentMessage = message; sentOptions = options;
         return acknowledgement;
       },
     },
@@ -53,6 +57,43 @@ async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
   for await (const value of stream) values.push(value);
   return values;
 }
+
+test('chat forwards images with text or alone and follows the same turn', async () => {
+  const images = [
+    { data: Buffer.from([0xff, 0xd8, 0xff]), filename: 'photo.jpg', mimeType: 'image/jpeg' },
+    new File([new Uint8Array([1, 2, 3])], 'image.png', { type: 'image/png' }),
+  ];
+  for (const message of ['Describe this', '']) {
+    const h = harness();
+    const reading = collect(followTurn(h.client, message, { images, sessionId: 'chat' }));
+    await tick();
+    assert.equal(h.sentMessage, message);
+    assert.equal(h.sentOptions?.images, images);
+    assert.equal(h.sentOptions?.sessionId, 'chat');
+    assert.ok(h.sentOptions?.signal instanceof AbortSignal);
+    h.accept(ack);
+    h.emit(event('delta.message_done', { message_id: 'r1', reply_to_message_id: 'u1', content: 'A picture' }));
+    h.emit(event('task.status', { reply_to_message_id: 'u1', status: 'completed' }));
+    assert.deepEqual((await reading).map((e) => e.type), ['reply', 'task-finished']);
+    assert.ok(h.closed);
+  }
+});
+
+test('invalid images fail before subscribing, and image turns clean up on cancellation', async () => {
+  const h = harness();
+  await assert.rejects(collect(followTurn(h.client, '', {
+    images: [{ data: Buffer.alloc(0), filename: 'photo.jpg', mimeType: 'image/jpeg' }],
+  })), /non-empty Uint8Array/);
+  assert.equal(h.sent, false);
+  assert.equal(h.closed, false);
+  const abort = new AbortController();
+  const reading = assert.rejects(collect(followTurn(h.client, '', {
+    images: [{ data: Buffer.from([1]), filename: 'photo.jpg', mimeType: 'image/jpeg' }], signal: abort.signal,
+  })), /Stopped/);
+  await tick(); abort.abort(new Error('Stopped'));
+  await reading;
+  assert.ok(h.closed);
+});
 
 test('chat reads events while acknowledgement is pending, yields only bound replies and cleans up', async () => {
   const h = harness();

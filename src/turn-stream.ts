@@ -1,10 +1,10 @@
-import type { MuseClient } from './client.js';
+import type { MuseClient, SendOptions } from './client.js';
+import { validateMessage } from './message.js';
 import { MuseError } from './errors.js';
 import { MuseTurn } from './turn.js';
 import type { TurnEvent, TurnOptions } from './turn.js';
 
-export interface ChatOptions extends TurnOptions {
-  signal?: AbortSignal;
+export interface ChatOptions extends TurnOptions, SendOptions {
   /** Overall deadline, including acknowledgement and reply. Default: 120 seconds. */
   timeoutMs?: number;
 }
@@ -29,7 +29,7 @@ async function until<T>(pending: Promise<T>, ms: number, signal: AbortSignal): P
 export async function* followTurn(
   client: Pick<MuseClient, 'subscribe' | 'sendMessage'>, message: string, options: ChatOptions = {},
 ): AsyncGenerator<TurnEvent> {
-  if (!message.trim()) throw new MuseError('Message must not be empty');
+  validateMessage(message, options.images);
   const timeoutMs = options.timeoutMs ?? 120000;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2147483647) {
     throw new MuseError('Chat timeout must be a positive integer no greater than 2147483647');
@@ -46,7 +46,7 @@ export async function* followTurn(
     iterator = events[Symbol.asyncIterator]();
     let next = iterator.next().then((value) => ({ kind: 'event' as const, value }));
     void next.catch(() => {});
-    const ack = client.sendMessage(message, { sessionId: options.sessionId, signal })
+    const ack = client.sendMessage(message, { sessionId: options.sessionId, images: options.images, signal })
       .then((value) => ({ kind: 'ack' as const, value }));
     void ack.catch(() => {});
     while (true) {
