@@ -1,6 +1,6 @@
 {
   "name": "muse-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Unofficial TypeScript client for Muse gadget chat",
   "type": "module",
   "license": "Apache-2.0",
